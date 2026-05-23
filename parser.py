@@ -1,12 +1,13 @@
 import os
+import sys
 from datetime import datetime
 from typing import Dict
 from config import Config
-from src.api import HHAPI, SuperJobAPI
+from src.api import SuperJobAPI
 from src.sql_storage import SQLStorage
-from src.email_sender import EmailSender
 from src.vacancy import Vacancy
 from src.selenium_parser_hh import HHSeleniumParser
+from src.selenium_parser_zarplata import ZarplataSeleniumParser
 
 class VacancyParser:
     def __init__(self):
@@ -15,19 +16,12 @@ class VacancyParser:
         
         # Инициализация API используя Config
         self.hh_parser = None
+        self.zarplata_parser = None
         self.sj_api = SuperJobAPI(api_key=self.config.sj_api_key)
         
         # Инициализация хранилища (база в корне проекта)
         db_path = os.path.join(os.path.dirname(__file__), 'vacancies.db')
         self.storage = SQLStorage(db_path)
-        
-        # Инициализация email отправителя
-        self.email_sender = EmailSender(
-            smtp_server=self.config.smtp_server,
-            smtp_port=self.config.smtp_port,
-            login=self.config.email_login,
-            password=self.config.email_password
-        )
         
         # Показываем конфигурацию при запуске
         self.config.print_config()
@@ -115,8 +109,10 @@ class VacancyParser:
         print(f'\n{"="*60}')
         print(f'🔄 Запуск парсера: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
         print(f'\n{"="*60}')
-        stats = {'hh_total': 0, 'sj_total': 0, 'hh_new': 0, 'sj_new': 0}
+        stats = {'hh_total': 0, 'sj_total': 0, 'zp_total': 0, 'hh_new': 0, 'sj_new': 0, 'zp_new': 0}
         
+        all_current_links = []
+
         # Парсим HH
         print('\n📥 Парсинг HeadHunter через Selenium...')
         try:
@@ -136,6 +132,31 @@ class VacancyParser:
         finally:
             if self.hh_parser:
                 self.hh_parser.close()
+        
+        if hh_vacancies:
+            all_current_links.extend([v.link for v in hh_vacancies])
+
+        #Парсим ZarplataRU
+        print('Парсим Zarplata.ru с помощью Selenium...')
+        try:
+            self.zarplata_parser = ZarplataSeleniumParser()
+            zp_vacancies = self.zarplata_parser.search(search_query, max_pages)
+            self.zarplata_parser.close()
+            stats['zp_total'] = len(zp_vacancies)
+
+            if zp_vacancies:
+                result = self.storage.add_vacancies(zp_vacancies, self.is_junior_vacancy)
+                stats['zp_new'] = result['new']
+                print(f'Всего: {stats["zp_total"]}, новых junior: {stats["zp_new"]}')
+        
+        except Exception as e:
+            print(f'Ошибка: {e}')
+        finally:
+            if self.zarplata_parser:
+                self.zarplata_parser.close()
+        if zp_vacancies:
+            all_current_links.extend([v.link for v in zp_vacancies])
+
                 
         # Парсим SuperJob
         print('\n📥 Парсинг SuperJob...')
@@ -203,52 +224,17 @@ class VacancyParser:
                         salary = 'з/п не указана'
                         print(f"  {i}. {vac['title'][:50]}")
                         print(f"   {salary} | {vac.get('experience', 'опыт не указан')}")
+        
+        if filtered:
+            all_current_links.extend([v.link for v in filtered])
+        
+        if all_current_links:
+            print('\n Проверка актуальности вакансий...')
+            self.storage.remove_stale_vacancies(all_current_links)
         #Логируем результаты
         self.storage.log_parse(stats)
         return stats
     
-    
-    def send_report_if_needed(self):
-        """Отправка отчета если есть новые junior вакансии"""
-        print('\n📧 Проверяем необходимость отправки...')
-        
-        # Проверяем, указан ли email получателя
-        if not self.config.to_email:
-            print('   ❌ Email получателя не указан в .env файле')
-            print('   Добавьте TO_EMAIL=ваш_email@example.com в .env')
-            return
-        
-        # Получаем новые вакансии
-        new_juniors = self.storage.get_new_vacancies_for_notification(
-            hours=self.config.check_hours
-        )
-        
-        all_unsent = self.storage.get_all_unsent_juniors()
-        
-        print(f'   Новых junior за {self.config.check_hours} ч.: {len(new_juniors)}')
-        print(f'   Всего неотправленных junior: {len(all_unsent)}')
-        
-        stats = {
-            'total_new': len(new_juniors),
-            'hh_juniors': len([v for v in new_juniors if v['platform'] == 'hh']),
-            'sj_juniors': len([v for v in new_juniors if v['platform'] == 'sj'])
-        }
-        
-        if new_juniors:
-            print(f'\n🎯 Найдены новые junior вакансии! Отправляем отчет...')
-            
-            for i, vac in enumerate(new_juniors[:5], 1):
-                salary = f"{vac.get('salary_from', 0)} - {vac.get('salary_to', 0)} {vac.get('currency', '')}"
-                print(f"   {i}. {vac['title'][:50]} | {salary} | {vac['platform']}")
-            
-            #if self.email_sender.send_report(self.config.to_email, new_juniors, stats):
-             #   notified_ids = [v['id'] for v in new_juniors]
-              #  self.storage.mark_as_notified(notified_ids)
-               # print(f'   ✅ Отмечено {len(notified_ids)} вакансий как отправленные')
-     #   else:
-      #      print('   📭 Нет новых вакансий для отправки')
-        
-        self.print_stats()
     
     def print_stats(self):
         """Вывод статистики"""
@@ -261,7 +247,7 @@ class VacancyParser:
             return
             
         for platform, data in stats.items():
-            platform_name = 'HeadHunter' if platform == 'hh' else 'SuperJob'
+            platform_name = 'HeadHunter' if platform == 'hh' else 'SuperJob' if platform == 'sj' else 'Zarplata'
             print(f'\n{platform_name}:')
             print(f'   Всего в базе: {data["total"]}')
             print(f'   Junior вакансий: {data["junior"]}')
@@ -283,22 +269,26 @@ class VacancyParser:
 
 
 def main():
-    """Основная функция"""
     try:
         print('🚀 Запуск парсера вакансий...')
+        
+        # Аргументы командной строки
+        pages = None
+        query = None
+        if len(sys.argv) > 1:
+            try:
+                pages = int(sys.argv[1])
+            except ValueError:
+                pass
+        if len(sys.argv) > 2:
+            query = sys.argv[2]
+        
         parser = VacancyParser()
-        
-        # Парсим вакансии
-        parser.parse_vacancies()
-        
-        # Отправляем отчет если есть новые
+        parser.parse_vacancies(search_query=query, max_pages=pages)
         parser.send_report_if_needed()
-        
-        # Показываем последние вакансии
         parser.show_recent_juniors(5)
         
         print('\n✅ Работа парсера успешно завершена')
-        
     except KeyboardInterrupt:
         print('\n⚠️  Работа прервана пользователем')
     except Exception as e:

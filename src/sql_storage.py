@@ -1,7 +1,9 @@
 import sqlite3
-from datetime import datetime, timedelta
-from typing import List, Optional
+from datetime import datetime
+from typing import List
+
 from .vacancy import Vacancy
+
 
 class SQLStorage:
     def __init__(self, db_name: str = 'vacancies.db'):
@@ -213,3 +215,28 @@ class SQLStorage:
                 LIMIT ?
             """, (limit,))
             return [dict(row) for row in cursor.fetchall()]
+        
+    def remove_stale_vacancies(self, current_links: list):
+        """
+        Удаляет вакансии, которых больше нет на сайте
+        current_links - список актуальных ссылок, полученных при парсинге"""
+        if not current_links:
+            print('Нет ссылок для проверки, удаление пропущено')
+            return 0
+        with sqlite3.connect(self.db_name) as conn:
+            #Удаляем все не из списка актуальных
+            placeholders = ','.join('?' * len(current_links))
+            cursor = conn.execute(f"""
+                DELETE FROM vacancies
+                WHERE link NOT IN ({placeholders})
+            """, current_links)
+            deleted = cursor.rowcount
+            conn.commit()
+
+            if deleted > 0:
+                print(f' Удалено устаревших вакансий: {deleted}')
+            else:
+                print(' Все вакансии актуальны')
+            return deleted
+        
+        

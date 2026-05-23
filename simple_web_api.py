@@ -1,11 +1,9 @@
-from fastapi import FastAPI, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 import sqlite3
-from datetime import datetime
-from typing import Optional
-import os
 from parser import VacancyParser
+from typing import Optional
+
+from fastapi import FastAPI, Query
+from fastapi.responses import HTMLResponse
 
 app = FastAPI(title='Парсер вакансий Python', version='2.0')
 
@@ -341,7 +339,12 @@ def generate_main_page():
                 background: #4ecdc4;
                 color: white;
             }
-            
+                        
+            .badge-zp {
+                background: #f39c12; 
+                color: white; 
+            }
+                        
             .badge-junior {
                 background: #ffd700;
                 color: #333;
@@ -472,6 +475,7 @@ def generate_main_page():
                         <option value="">Все платформы</option>
                         <option value="hh">HeadHunter</option>
                         <option value="sj">SuperJob</option>
+                        <option value="zp">Zarplata</option>
                     </select>
                     <select id="juniorFilter" onchange="filterVacancies()">
                         <option value="">Все уровни</option>
@@ -555,8 +559,10 @@ def generate_main_page():
                 
                 let html = '';
                 vacancies.forEach(vac => {
-                    const platformBadge = vac.platform === 'hh' ? 'badge-hh' : 'badge-sj';
-                    const platformName = vac.platform === 'hh' ? 'HH' : 'SJ';
+                    const platformBadge = vac.platform === 'hh' ? 'badge-hh' : 
+                                          vac.platform === 'sj' ? 'badge-sj' : 'badge-zp';
+                    const platformName = vac.platform === 'hh' ? 'HH' : 
+                                         vac.platform === 'sj' ? 'SJ' : 'ZP';
                     const juniorClass = vac.is_junior ? 'junior' : '';
                     const juniorBadge = vac.is_junior ? '<span class="badge badge-junior">Junior</span>' : '';
                     

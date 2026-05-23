@@ -1,15 +1,20 @@
 import os
-import time
 import random
 import re
-from typing import List
+import sys
+import time
+from typing import List, Optional
+
 from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.edge.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+
 from .vacancy import Vacancy
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from config import Config
 
 driver_path = "C:\\Users\\Evgeny\\Documents\\python\\vacancy_parser\\webdriver\\msedgedriver.exe"
 
@@ -51,57 +56,86 @@ class HHSeleniumParser:
         time.sleep(random.uniform(min_sec, max_sec))
 
     def _human_scroll(self):
-        total_height = self.driver.execute_script('return document.body.scrollHeight')
-        current = 0
-        while current < total_height:
-            scroll_by = random.randint(100,300)
-            current += scroll_by
-            self.driver.execute_script(f'window.scrollTo(0,{current});')
-            self._random_delay(0.1, 0.3)
+        """Прокрутка до самого низа с ожиданием подгрузки"""
+        last_height = self.driver.execute_script("return document.body.scrollHeight")
+    
+        while True:
+            # Скроллим вниз
+            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            self._random_delay(2, 3)  # Ждём подгрузку
         
-        if random.random() > 0.5:
-            self.driver.execute_script('window.scrollTo(0, 0);')
-            self._random_delay(0.5, 1.0)
+            # Проверяем новую высоту
+            new_height = self.driver.execute_script("return document.body.scrollHeight")
+            if new_height == last_height:
+                break  # Достигли конца
+            last_height = new_height
 
-    def search(self, query: str, max_pages: int = 3) -> List[Vacancy]:
+    def search(self, query: str, max_pages: Optional[int] = None) -> List[Vacancy]:
+        if max_pages is None:
+            max_pages = Config().max_pages
+        if max_pages == 0:
+            max_pages = 20
+            print(f' Режим: без ограничений (макс. {max_pages} страниц)')
+    
         vacancies = []
         print(f' HH Selenium: поиск "{query}"')
 
         for page in range(max_pages):
             try:
-                url = f'https://hh.ru/search/vacancy?search_field=name&text={query}&page={page}&area=113'
-                print(f' Страница {page + 1}...')
-                self.driver.delete_all_cookies()
-                self.driver.get(url)
-                self._random_delay(2, 4)
+                if page == 0:
+                    url = (
+                        f'https://hh.ru/search/vacancy'
+                        f'?search_field=name'
+                        f'&search_field=description'
+                        f'&text={query}'
+                        f'&area=1'
+                        f'&experience=noExperience'
+                        f'&items_on_page=100'
+                        f'&page=0'
+                        f'&order_by=relevance'
+                    )
+                    print(f' Страница {page + 1}...')
+                    self.driver.delete_all_cookies()
+                    self.driver.get('https://hh.ru')
+                    self._random_delay(1, 2)
+                    self.driver.get(url)
+                else:
+                    print(f' Страница {page + 1}...')
+                    try:
+                        next_btn = self.driver.find_element(By.CSS_SELECTOR, '[data-qa="pager-next"]')
+                        next_btn.click()
+                    except Exception:
+                        print(' Кнопка "далее" не найдена — конец')
+                        break
+        
+                self._random_delay(3, 5)
                 self._human_scroll()
                 self._random_delay(1, 2)
-                try:
-                    cards = self.wait.until(
-                        EC.presence_of_all_elements_located(
-                            (By.CSS_SELECTOR, '[data-qa="vacancy-serp__vacancy"]')
-                        )
-                    )
-                except TimeoutException:
-                    print(f' Вакансии не найдены на странице {page + 1}')
-                    break
+        
+                cards = self.driver.find_elements(By.CSS_SELECTOR, '[data-qa="vacancy-serp__vacancy"]')
                 print(f' Найдено карточек: {len(cards)}')
-
+        
                 for card in cards:
                     try:
                         vacancy = self._parse_card(card)
                         if vacancy:
                             vacancies.append(vacancy)
-                    except Exception as e:
-                        print(f' Ошибка парсинга карточки {e}')
+                    except Exception:
                         continue
-                
-                if len(cards) < 20:
-                    print(f' Достигнут конец результатов')
+        
+        # Одна проверка — есть ли смысл идти дальше
+                try:
+                    next_btn = self.driver.find_element(By.CSS_SELECTOR, '[data-qa="pager-next"]')
+                    # Проверяем что кнопка активна
+                    if not next_btn.is_enabled():
+                        print(' Достигнут конец результатов')
+                        break
+                except Exception:
+                    print(' Пагинация не найдена — конец')
                     break
-
-                if page < max_pages -1:
-                    self._random_delay(3, 6)
+        
+                self._random_delay(3, 6)
+        
             except Exception as e:
                 print(f' Ошибка на странице {page + 1}: {str(e)[:200]}')
                 break
@@ -147,10 +181,9 @@ class HHSeleniumParser:
                 pass
 
             #Компания
-            company = ''
             try:
                 company_el = card.find_element(By.CSS_SELECTOR, '[data-qa*="company"]')
-                company = company_el.text.strip()
+                company_el.text.strip()
             except NoSuchElementException:
                 pass
 
@@ -211,7 +244,7 @@ class HHSeleniumParser:
             try:
                 self.driver.quit()
                 print(' Драйвер закрыт')
-            except:
+            except Exception:
                 pass
 
     def __del__(self):

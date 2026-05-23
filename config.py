@@ -1,5 +1,7 @@
 import os
+
 from dotenv import load_dotenv
+
 
 class Config:
     def __init__(self, env_file='.env'):
@@ -11,26 +13,6 @@ class Config:
     @property
     def sj_api_key(self) -> str:
         return os.getenv('SJ_KEY')
-    
-    @property
-    def smtp_server(self) -> str:
-        return os.getenv('SMTP_SERVER', 'smtp.yandex.ru')
-    
-    @property
-    def smtp_port(self) -> int:
-        return int(os.getenv('SMTP_PORT', '465'))
-    
-    @property
-    def email_login(self) -> str:
-        return os.getenv('EMAIL_LOGIN')
-    
-    @property
-    def email_password(self) -> str:
-        return os.getenv('EMAIL_PASSWORD')
-    
-    @property
-    def to_email(self) -> str:
-        return os.getenv('TO_EMAIL')
     
     @property
     def search_query(self) -> str:
@@ -50,7 +32,5 @@ class Config:
         print(f"   Поиск: '{self.search_query}'")
         print(f"   Страниц: {self.max_pages}")
         print(f"   Интервал: {self.check_hours} ч.")
-        print(f"   Отправитель: {self.email_login or '❌ НЕ УКАЗАН'}")
-        print(f"   Получатель: {self.to_email or '❌ НЕ УКАЗАН'}")
         print(f"   SJ API: {'✓' if self.sj_api_key else '❌ НЕ УКАЗАН'}")
         print()

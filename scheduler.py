@@ -2,6 +2,7 @@ import time
 from datetime import datetime
 from parser import VacancyParser
 
+
 class ParserScheduler:
     def __init__(self):
         self.parser = VacancyParser()
@@ -33,8 +34,8 @@ class ParserScheduler:
     def start(self):
         """Запуск планировщика"""
         print('🤖 Парсер вакансий запущен')
-        print(f'📅 Интервал: каждые 6 часов')
-        print(f'🚀 Первый запуск: сейчас\n')
+        print('📅 Интервал: каждые 6 часов')
+        print('🚀 Первый запуск: сейчас\n')
         
         try:
             while True:

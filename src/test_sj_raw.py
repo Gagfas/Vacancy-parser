@@ -1,6 +1,7 @@
-import os
-import requests
 import json
+import os
+
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -42,7 +43,7 @@ if response.status_code == 200:
             else:
                 print(f'{key}:{value}')
         
-        print(f'\n Поля с описанием:')
+        print('\n Поля с описанием:')
         description_fields = ['candidat', 'vacancyRichText', 'work', 'compensation', 'client']
         for field in description_fields:
             value = obj.get(field, '')
