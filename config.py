@@ -26,6 +26,10 @@ class Config:
     def check_hours(self) -> int:
         return int(os.getenv('CHECK_HOURS', '6'))
     
+    @property
+    def raw_mode(self) -> bool:
+        return os.getenv('RAW_MODE', 'FALSE')
+    
     def print_config(self):
         """Выводит текущую конфигурацию"""
         print("\n📋 Конфигурация:")

@@ -9,6 +9,18 @@ from src.vacancy import Vacancy
 from src.selenium_parser_hh import HHSeleniumParser
 from src.selenium_parser_zarplata import ZarplataSeleniumParser
 
+
+BLACKLIST = [
+    'военный', 'военная', 'военное', 'полиция', 'полицейский',
+    'мвд', 'фсб', 'минобороны', 'вооруженные силы', 'армия',
+    'вмп', 'днр', 'лнр', 'спецопераци', 'мобилизац',
+    'солдат', 'сержант', 'офицер', 'контрактник',
+    'повестка', 'военкомат', 'призыв', 'воинск',
+    'рота', 'роте', 'полиции', 'батальон', 'полк', 'дивизия',
+    'контракт', 'надбавки за участие', 'единовременная выплата'
+    ]
+
+
 class VacancyParser:
     def __init__(self):
         # Загружаем конфигурацию
@@ -32,17 +44,7 @@ class VacancyParser:
         title_lower = vacancy.title.lower()
         desc_lower = vacancy.description.lower() if vacancy.description else ''
 
-
-        blacklist = [
-    'военный', 'военная', 'военное', 'полиция', 'полицейский',
-    'мвд', 'фсб', 'минобороны', 'вооруженные силы', 'армия',
-    'вмп', 'днр', 'лнр', 'спецопераци', 'мобилизац',
-    'солдат', 'сержант', 'офицер', 'контрактник',
-    'повестка', 'военкомат', 'призыв', 'воинск',
-    'рота', 'роте', 'полиции', 'батальон', 'полк', 'дивизия'
-        ]
-
-        for word in blacklist:
+        for word in BLACKLIST:
             if word in title_lower or word in desc_lower:
                 print(f'   🗑️ Отсеяно по слову "{word}": {vacancy.title[:60]}')
                 return False
@@ -113,6 +115,8 @@ class VacancyParser:
         
         all_current_links = []
 
+        raw_mode = self.config.raw_mode
+
         # Парсим HH
         print('\n📥 Парсинг HeadHunter через Selenium...')
         try:
@@ -123,9 +127,14 @@ class VacancyParser:
             stats['hh_total'] = len(hh_vacancies)
 
             if hh_vacancies:
-                result = self.storage.add_vacancies(hh_vacancies, self.is_junior_vacancy)
-                stats['hh_new'] = result['new']
-                print(f' Всего: {stats["hh_total"]}, новых junior: {stats["hh_new"]}')
+                if raw_mode:
+                    result = self.storage.add_vacancies(hh_vacancies, is_junior_func=None)
+                    stats['hh_new'] = result['new']
+                    print(f' Всего: {stats["hh_total"]}')
+                else:
+                    result = self.storage.add_vacancies(hh_vacancies, self.is_junior_vacancy)
+                    stats['hh_new'] = result['new']
+                    print(f' Всего: {stats["hh_total"]}, новых junior: {stats["hh_new"]}')
         
         except Exception as e:
             print(f' Ошибка HH: {e}')
@@ -145,9 +154,14 @@ class VacancyParser:
             stats['zp_total'] = len(zp_vacancies)
 
             if zp_vacancies:
-                result = self.storage.add_vacancies(zp_vacancies, self.is_junior_vacancy)
-                stats['zp_new'] = result['new']
-                print(f'Всего: {stats["zp_total"]}, новых junior: {stats["zp_new"]}')
+                if raw_mode:
+                    result = self.storage.add_vacancies(zp_vacancies, is_junior_func=None)
+                    stats['zp_new'] = result['new']
+                    print(f'Всего: {stats["zp_total"]}')
+                else:
+                    result = self.storage.add_vacancies(zp_vacancies, self.is_junior_vacancy)
+                    stats['zp_new'] = result['new']
+                    print(f'Всего: {stats["zp_total"]}, новых junior: {stats["zp_new"]}')
         
         except Exception as e:
             print(f'Ошибка: {e}')
@@ -170,68 +184,88 @@ class VacancyParser:
         all_vacancies = []
         seen_links = set()
 
-        for variant in search_variants[:3]:
+        if raw_mode:
+            print('\n📥 Парсинг SuperJob (raw-режим)...')
             try:
-                vacancies = self.sj_api.get_vacancies_all_pages(variant, max_pages)
-                print(f'   По запросу "{variant}": {len(vacancies)} вакансий')
-                for vac in vacancies:
-                    if vac.link not in seen_links:
-                        seen_links.add(vac.link)
-                        all_vacancies.append(vac)
+                vacancies = self.sj_api.get_vacancies_all_pages(search_query, max_pages)
+                print(f'   По запросу "{search_query}": {len(vacancies)} вакансий')
+                vacancies = [
+                        v for v in vacancies
+                        if not any(w in v.title.lower() or w in (v.description or '').lower() for w in BLACKLIST)
+                ]
+                stats['sj_total'] = len(vacancies)
+                if vacancies:
+                    result = self.storage.add_vacancies(vacancies, is_junior_func=None)
+                    stats['sj_new'] = result['new']
+                    all_current_links.extend([v.link for v in vacancies])
             except Exception as e:
-                print(f'   ⚠️ Ошибка для "{variant}": {e}')
-        print(f'   Всего уникальных: {len(all_vacancies)}')
+                print(f'   ⚠️ Ошибка SJ raw: {e}')
 
-        it_keywords = ['python', 'питон', 'разработчик', 'программист', 'developer',
-                   'software', 'web', 'backend', 'frontend', 'аналитик', 
-                   'тестировщик', 'qa', 'devops', 'data', 'machine learning']
-        
-        blacklist = ['военный', 'полиция', 'вмп', 'днр', 'роте', 'рота', 'солдат', 'офицер']
+        else:
+            for variant in search_variants[:3]:
+                try:
+                    vacancies = self.sj_api.get_vacancies_all_pages(variant, max_pages)
+                    print(f'   По запросу "{variant}": {len(vacancies)} вакансий')
+                    for vac in vacancies:
+                        if vac.link not in seen_links:
+                            seen_links.add(vac.link)
+                            all_vacancies.append(vac)
+                except Exception as e:
+                    print(f'   ⚠️ Ошибка для "{variant}": {e}')
+            print(f'   Всего уникальных: {len(all_vacancies)}')
 
         filtered = []
         filtered_out = []
 
-        for vac in all_vacancies:
-            title_lower = vac.title.lower()
-            desc_lower = vac.description.lower() if vac.description else ''
+        if not raw_mode:
+            it_keywords = ['python', 'питон', 'разработчик', 'программист', 'developer',
+                   'software', 'web', 'backend', 'frontend', 'аналитик', 
+                   'тестировщик', 'qa', 'devops', 'data', 'machine learning']
+                   
+            for vac in all_vacancies:
+                title_lower = vac.title.lower()
+                desc_lower = vac.description.lower() if vac.description else ''
             
-            if any(word in title_lower or word in desc_lower for word in blacklist):
-                print(f'Отфильтровано: {vac.title[:60]}')
-                continue
+                if any(word in title_lower or word in desc_lower for word in BLACKLIST):
+                    print(f'Отфильтровано: {vac.title[:60]}')
+                    continue
             
-            is_it = any(keyword in title_lower for keyword in it_keywords) or \
-                any(keyword in desc_lower for keyword in it_keywords)
-            if is_it:
-                filtered.append(vac)
-            else:
-                filtered_out.append(vac)
-        if filtered_out:
-            print(f'   🗑️ Отфильтровано не IT: {len(filtered_out)}')
-            for vac in filtered_out[:3]:  # Показываем первые 3
-                print(f'      - {vac.title[:70]}')
-        stats['sj_total'] = len(filtered)
-        print(f" После фильтрации IT: {stats['sj_total']}")
-        if filtered:
-            result = self.storage.add_vacancies(filtered, self.is_junior_vacancy)
-            stats['sj_new'] = result['new']
-            print(f'Сохранено новых junior: {stats["sj_new"]}')
-            if stats['sj_new'] > 0:
-                print('\n Примеры новых junior вакансий:')
-                juniors = self.storage.get_recent_juniors(5)
-                for i, vac in enumerate(juniors, 1):
-                    salary = f"{vac.get('salary_from', 0)}-{vac.get('salary_to', 0)} {vac.get('currency', '')}"
-                    if vac.get('salary_from') == 0 and vac.get('salary_to') == 0:
-                        salary = 'з/п не указана'
-                        print(f"  {i}. {vac['title'][:50]}")
-                        print(f"   {salary} | {vac.get('experience', 'опыт не указан')}")
+                is_it = any(keyword in title_lower for keyword in it_keywords) or \
+                    any(keyword in desc_lower for keyword in it_keywords)
+                if is_it:
+                    filtered.append(vac)
+                else:
+                    filtered_out.append(vac)
+            if filtered_out:
+                print(f'   🗑️ Отфильтровано не IT: {len(filtered_out)}')
+                for vac in filtered_out[:3]:  # Показываем первые 3
+                    print(f'      - {vac.title[:70]}')
+            stats['sj_total'] = len(filtered)
+            print(f" После фильтрации IT: {stats['sj_total']}")
+            if filtered:
+                result = self.storage.add_vacancies(filtered, self.is_junior_vacancy)
+                stats['sj_new'] = result['new']
+                print(f'Сохранено новых junior: {stats["sj_new"]}')
+                if stats['sj_new'] > 0:
+                    print('\n Примеры новых junior вакансий:')
+                    juniors = self.storage.get_recent_juniors(5)
+                    for i, vac in enumerate(juniors, 1):
+                        salary = f"{vac.get('salary_from', 0)}-{vac.get('salary_to', 0)} {vac.get('currency', '')}"
+                        if vac.get('salary_from') == 0 and vac.get('salary_to') == 0:
+                            salary = 'з/п не указана'
+                            print(f"  {i}. {vac['title'][:50]}")
+                            print(f"   {salary} | {vac.get('experience', 'опыт не указан')}")
         
-        if filtered:
-            all_current_links.extend([v.link for v in filtered])
-        
+            if filtered:
+                all_current_links.extend([v.link for v in filtered])
+        else:
+            stats['sj_total'] = len(vacancies) if 'vacancies' in locals() else 0
+
         if all_current_links:
             print('\n Проверка актуальности вакансий...')
             self.storage.remove_stale_vacancies(all_current_links)
-        #Логируем результаты
+
+            
         self.storage.log_parse(stats)
         return stats
     
@@ -285,7 +319,6 @@ def main():
         
         parser = VacancyParser()
         parser.parse_vacancies(search_query=query, max_pages=pages)
-        parser.send_report_if_needed()
         parser.show_recent_juniors(5)
         
         print('\n✅ Работа парсера успешно завершена')
