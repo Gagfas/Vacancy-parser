@@ -2,7 +2,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from ..src.api import SuperJobAPI
+from src.api import SuperJobAPI
 
 
 @pytest.fixture
@@ -14,7 +14,7 @@ def sj_api():
 def test_get_vacancies(mock_get, sj_api):
     mock_response = Mock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {'object':[]}
+    mock_response.json.return_value = {'objects': [{"profession": "Python Dev"}]}
     mock_get.return_value = mock_response
     result = sj_api.get_vacancies('Python', page=0)
     assert len(result) == 1

@@ -100,7 +100,7 @@ class SQLStorage:
                         vacancy.currency,
                         vacancy.description,
                         vacancy.experience or '',
-                        is_junior or existing[1],
+                        is_junior if is_junior else existing[1],
                         vacancy.link
                     ))
                     conn.commit()
@@ -121,7 +121,7 @@ class SQLStorage:
                         vacancy.platform,
                         vacancy.experience or '',
                         is_junior,
-                        datetime.now()
+                        datetime.now().isoformat()
                     ))
                     conn.commit()
                     return True
