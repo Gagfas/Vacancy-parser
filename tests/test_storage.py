@@ -2,10 +2,8 @@ import pytest
 import os
 import time
 import sqlite3
-import tempfile
 import random
 import string
-from datetime import datetime, timedelta
 from src.sql_storage import SQLStorage
 from src.vacancy import Vacancy
 
