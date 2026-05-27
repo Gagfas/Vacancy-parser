@@ -469,8 +469,11 @@ def test_no_duplicate(storage):
     vac = Vacancy('Test', 'https://test.com/nodup1', 10000, 100000, 'RUR', 'desc', 'hh', 'exp')
     first = storage.add_vacancy(vac, is_junior=True)
     second = storage.add_vacancy(vac, is_junior=True)
+    assert first is True
+    assert second is False
     all_vacs = storage.get_recent_juniors(limit=5)
     assert len(all_vacs) == 1
+    
 
 def test_remove_old_vacancies(storage):
     vac = Vacancy('Test', 'https://test.com/old1', 10000, 100000, 'RUR', 'desc', 'hh', 'exp')
