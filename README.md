@@ -1,6 +1,10 @@
 # Парсер Вакансий 📊
 
-Автоматизированный парсер вакансий с популярных сайтов поиска работы (hh.ru, SuperJob, Zarplata.ru) с функцией уведомлений о новых junior вакансиях.
+Автоматизированный парсер вакансий с популярных сайтов поиска работы (hh.ru, SuperJob, Zarplata.ru) с WEB интерфейсом. 
+
+![CI/CD](https://github.com/Gagfas/Vacancy-parser/actions/workflows/ci.yml/badge.svg)
+![Tests](https://img.shields.io/badge/tests-33%20passed-brightgreen)
+![Docker](https://img.shields.io/badge/docker-ready-blue)
 
 ## 🎯 Основные возможности
 
@@ -10,7 +14,6 @@
   - Zarplata.ru (с использованием Selenium)
 
 - **Автоматическое расписание** - периодическая проверка новых вакансий
-- **Уведомления** - отправка уведомлений о новых junior вакансиях
 - **База данных SQLite** - сохранение и отслеживание вакансий
 - **Веб API** - FastAPI для доступа к данным через HTTP
 - **Фильтрация** - черный список профессий/ключевых слов
