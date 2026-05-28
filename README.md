@@ -1,6 +1,6 @@
 # Парсер Вакансий 📊
 
-Автоматизированный парсер вакансий с популярных сайтов поиска работы (hh.ru, SuperJob, Zarplata.ru) с WEB интерфейсом. 
+Автоматизированный парсер вакансий с популярных сайтов поиска работы (hh.ru, SuperJob, Zarplata.ru) с WEB интерфейсом. Парсер настроен на поиск вакансий для позиции Junior Python разработчика, но может искать вакансии по запросу. Для этого необходимо перевести значение raw_mode = True.
 
 ![CI/CD](https://github.com/Gagfas/Vacancy-parser/actions/workflows/ci.yml/badge.svg)
 ![Tests](https://img.shields.io/badge/tests-33%20passed-brightgreen)
