@@ -2,6 +2,8 @@
 
 Автоматизированный парсер вакансий с популярных сайтов поиска работы (hh.ru, SuperJob, Zarplata.ru) с WEB интерфейсом. Парсер настроен на поиск вакансий для позиции Junior Python разработчика, но может искать вакансии по запросу. Для этого необходимо перевести значение raw_mode = True.
 
+Для удобства можно использовать bat файлы в папке со скриптом. Главным файлом является файл manager.bat через который можно установить скрипт в автозагрузку.
+
 ![CI/CD](https://github.com/Gagfas/Vacancy-parser/actions/workflows/ci.yml/badge.svg)
 ![Tests](https://img.shields.io/badge/tests-33%20passed-brightgreen)
 ![Docker](https://img.shields.io/badge/docker-ready-blue)
@@ -28,7 +30,7 @@
 ### 1. Клонирование репозитория
 
 ```bash
-git clone https://github.com/yourusername/vacancy_parser.git
+git clone https://github.com/Gagfas/vacancy_parser.git
 cd vacancy_parser
 ```
 
