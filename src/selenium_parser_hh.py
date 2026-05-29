@@ -16,7 +16,8 @@ from .vacancy import Vacancy
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from config import Config
 
-driver_path = "C:\\Users\\Evgeny\\Documents\\python\\vacancy_parser\\webdriver\\msedgedriver.exe"
+driver_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'webdriver')
+driver_path = os.path.join(driver_dir, 'msedgedriver.exe')
 
 
 class HHSeleniumParser:
@@ -86,14 +87,14 @@ class HHSeleniumParser:
                     url = (
                         f'https://hh.ru/search/vacancy'
                         f'?search_field=name'
+                        f'&search_field=company_name'
                         f'&search_field=description'
                         f'&text={query}'
-                        f'&area=1'
-                        f'&experience=noExperience'
+                        f'&enable_snippets=false'
                         f'&items_on_page=100'
                         f'&page=0'
                         f'&order_by=relevance'
-                    )
+                        )
                     print(f' Страница {page + 1}...')
                     self.driver.delete_all_cookies()
                     self.driver.get('https://hh.ru')
@@ -103,10 +104,16 @@ class HHSeleniumParser:
                     print(f' Страница {page + 1}...')
                     try:
                         next_btn = self.driver.find_element(By.CSS_SELECTOR, '[data-qa="pager-next"]')
-                        next_btn.click()
+                         # Скроллим к кнопке
+                        self.driver.execute_script("arguments[0].scrollIntoView(true);", next_btn)
+                        self._random_delay(0.5, 1)
+                        # Кликаем через JavaScript (надёжнее)
+                        self.driver.execute_script("arguments[0].click();", next_btn)
+                        self._random_delay(3, 5)  # Ждём загрузку
                     except Exception:
                         print(' Кнопка "далее" не найдена — конец')
                         break
+
         
                 self._random_delay(3, 5)
                 self._human_scroll()
@@ -122,24 +129,24 @@ class HHSeleniumParser:
                             vacancies.append(vacancy)
                     except Exception:
                         continue
-        
-        # Одна проверка — есть ли смысл идти дальше
-                try:
-                    next_btn = self.driver.find_element(By.CSS_SELECTOR, '[data-qa="pager-next"]')
-                    # Проверяем что кнопка активна
-                    if not next_btn.is_enabled():
-                        print(' Достигнут конец результатов')
+
+                if page < max_pages - 1:
+                    try:
+                        next_btn = self.driver.find_element(By.CSS_SELECTOR, '[data-qa="pager-next"]')
+                        if not next_btn.is_enabled():
+                            print(' Достигнут конец результатов')
+                            break
+                    except Exception:
+                        print(' Пагинация не найдена — конец')
                         break
-                except Exception:
-                    print(' Пагинация не найдена — конец')
-                    break
+
         
                 self._random_delay(3, 6)
         
             except Exception as e:
                 print(f' Ошибка на странице {page + 1}: {str(e)[:200]}')
                 break
-        print(f' Всего собрано: {len(vacancies)} вакансий')
+        
         return vacancies
     
     def _parse_card(self, card) -> Vacancy:
@@ -177,13 +184,6 @@ class HHSeleniumParser:
             try:
                 desc_el = card.find_element(By.CSS_SELECTOR, '[data-qa*="snippet"]')
                 description = desc_el.text.strip()
-            except NoSuchElementException:
-                pass
-
-            #Компания
-            try:
-                company_el = card.find_element(By.CSS_SELECTOR, '[data-qa*="company"]')
-                company_el.text.strip()
             except NoSuchElementException:
                 pass
 

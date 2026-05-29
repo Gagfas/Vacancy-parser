@@ -44,6 +44,7 @@ class VacancyParser:
         title_lower = vacancy.title.lower()
         desc_lower = vacancy.description.lower() if vacancy.description else ''
 
+
         for word in BLACKLIST:
             if word in title_lower or word in desc_lower:
                 print(f'   🗑️ Отсеяно по слову "{word}": {vacancy.title[:60]}')
@@ -127,14 +128,15 @@ class VacancyParser:
             stats['hh_total'] = len(hh_vacancies)
 
             if hh_vacancies:
-                if raw_mode:
+                if raw_mode:      
                     result = self.storage.add_vacancies(hh_vacancies, is_junior_func=None)
                     stats['hh_new'] = result['new']
                     print(f' Всего: {stats["hh_total"]}')
                 else:
+                    print(f'   Количество вакансий: {len(hh_vacancies)}')
                     result = self.storage.add_vacancies(hh_vacancies, self.is_junior_vacancy)
                     stats['hh_new'] = result['new']
-                    print(f' Всего: {stats["hh_total"]}, новых junior: {stats["hh_new"]}')
+                    print(f'   Всего: {stats["hh_total"]}, новых junior: {stats["hh_new"]}')
         
         except Exception as e:
             print(f' Ошибка HH: {e}')

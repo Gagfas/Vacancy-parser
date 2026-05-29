@@ -4,6 +4,7 @@ from typing import Optional
 
 from fastapi import FastAPI, Query
 from fastapi.responses import HTMLResponse
+from config import Config
 
 app = FastAPI(title='Парсер вакансий Python', version='2.0')
 
@@ -20,9 +21,11 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
-@app.get('/', response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse)
 async def index():
-    return generate_main_page()
+    config = Config()
+    search_query = config.search_query
+    return generate_main_page(search_query)
 
 @app.get('/api/vacancies')
 async def get_vacancies(
@@ -121,15 +124,19 @@ async def parse_status():
         'parser_ready': parser is not None
     }
 
-def generate_main_page():
+def generate_main_page(search_query: str):
     """Генерация HTML главной страницы"""
-    return HTMLResponse(content="""
+    html_content = """
     <!DOCTYPE html>
     <html lang="ru">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>🐍 Парсер вакансий Python</title>
+        <title>🐍 Парсер вакансий SEARCH_QUERY_PLACEHOLDER</title>
+    """
+    
+    
+    html_content += """
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             
@@ -434,7 +441,7 @@ def generate_main_page():
     <body>
         <div class="container">
             <div class="header">
-                <h1>🐍 Python Junior Vacancies</h1>
+                <h1>🔍 Вакансии: SEARCH_QUERY_PLACEHOLDER</h1>
                 <p>Актуальные вакансии для начинающих разработчиков</p>
                 <div class="controls">
                     <button class="btn btn-primary" onclick="fetchStats()">
@@ -496,7 +503,6 @@ def generate_main_page():
         <script>
             let allVacancies = [];
             
-            // Загрузка при старте
             document.addEventListener('DOMContentLoaded', function() {
                 fetchStats();
                 fetchVacancies();
@@ -548,12 +554,7 @@ def generate_main_page():
                 const container = document.getElementById('vacanciesContainer');
                 
                 if (!vacancies || vacancies.length === 0) {
-                    container.innerHTML = `
-                        <div class="empty-state">
-                            <h2>📭 Вакансии не найдены</h2>
-                            <p>Запустите парсинг или измените фильтры</p>
-                        </div>
-                    `;
+                    container.innerHTML = '<div class="empty-state"><h2>📭 Вакансии не найдены</h2><p>Запустите парсинг или измените фильтры</p></div>';
                     return;
                 }
                 
@@ -581,26 +582,22 @@ def generate_main_page():
                     
                     const date = vac.first_seen_at ? new Date(vac.first_seen_at).toLocaleString('ru-RU') : '';
                     
-                    html += `
-                        <div class="vacancy-card ${juniorClass}">
-                            <div class="vacancy-header">
-                                <div class="vacancy-title">
-                                    ${vac.title || 'Без названия'}
-                                </div>
-                                <div>
-                                    <span class="badge ${platformBadge}">${platformName}</span>
-                                    ${juniorBadge}
-                                </div>
-                            </div>
-                            <div class="salary">${salaryText}</div>
-                            <div class="description">${desc}</div>
-                            <div class="meta">
-                                <span>📅 ${date}</span>
-                                <span>📚 ${vac.experience || 'Не указан'}</span>
-                                <span>🔗 <a href="${vac.link}" target="_blank" style="color: #667eea;">Открыть вакансию</a></span>
-                            </div>
-                        </div>
-                    `;
+                    html += '<div class="vacancy-card ' + juniorClass + '">' +
+                        '<div class="vacancy-header">' +
+                            '<div class="vacancy-title">' + (vac.title || 'Без названия') + '</div>' +
+                            '<div>' +
+                                '<span class="badge ' + platformBadge + '">' + platformName + '</span>' +
+                                juniorBadge +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="salary">' + salaryText + '</div>' +
+                        '<div class="description">' + desc + '</div>' +
+                        '<div class="meta">' +
+                            '<span>📅 ' + date + '</span>' +
+                            '<span>📚 ' + (vac.experience || 'Не указан') + '</span>' +
+                            '<span>🔗 <a href="' + vac.link + '" target="_blank" style="color: #667eea;">Открыть вакансию</a></span>' +
+                        '</div>' +
+                    '</div>';
                 });
                 
                 container.innerHTML = html;
@@ -642,9 +639,7 @@ def generate_main_page():
                 toast.textContent = message;
                 document.body.appendChild(toast);
                 
-                setTimeout(() => {
-                    toast.remove();
-                }, 3000);
+                setTimeout(() => { toast.remove(); }, 3000);
             }
             
             function formatNumber(num) {
@@ -653,7 +648,11 @@ def generate_main_page():
         </script>
     </body>
     </html>
-    """)
+    """
+    
+    html_content = html_content.replace("SEARCH_QUERY_PLACEHOLDER", search_query)
+    
+    return HTMLResponse(content=html_content)
 
 if __name__ == '__main__':
     import uvicorn

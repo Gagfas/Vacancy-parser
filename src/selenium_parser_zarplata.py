@@ -10,25 +10,24 @@ class ZarplataSeleniumParser(HHSeleniumParser):
     def search(self, query: str, max_pages: Optional[int] = None) -> List[Vacancy]:
         vacancies = []
         for page in range(max_pages):
-            url = f'https://zarplata.ru/search/vacancy?text={query}&page={page}'
-            self.driver.get(url)
-            self._random_delay(3,5)
-            self._human_scroll()
-            
-            cards = self.driver.find_elements(
-                By.CSS_SELECTOR, '[data-qa="vacancy-serp__vacancy"]'
-            )
-            print(f' Найдено карточек: {len(cards)}')
-
-            for card in cards:
-                vacancy = self._parse_card(card)
-                if vacancy:
-                    vacancies.append(vacancy)
-
             try:
-                next_btn = self.driver.find_element(By.CSS_SELECTOR, '[data-qa="pager-next"]')
-                if not next_btn.is_enabled():
-                    break
+                if page == 0:
+                    url = f'https://zarplata.ru/search/vacancy?text={query}&page=0'
+                    self.driver.get(url)
+                else:
+                    next_btn = self.driver.find_element(By.CSS_SELECTOR, '[data-qa="pager-next"]')
+                    self.driver.execute_script("arguments[0].scrollIntoView(true);", next_btn)
+                    self.driver.execute_script("arguments[0].click();", next_btn)
+                    self._random_delay(3, 5)
+            
+                self._human_scroll()
+                cards = self.driver.find_elements(By.CSS_SELECTOR, '[data-qa="vacancy-serp__vacancy"]')
+                
+                for card in cards:  # ← парсинг карточек
+                    vacancy = self._parse_card(card)
+                    if vacancy:
+                        vacancies.append(vacancy)
+
             except Exception:
                 break
 

@@ -28,7 +28,11 @@ class Config:
     
     @property
     def raw_mode(self) -> bool:
-        return os.getenv('RAW_MODE', 'FALSE')
+        val = os.getenv('RAW_MODE', 'FALSE')
+        try:
+            return str(val).strip().lower() in ('1', 'true', 'yes', 'y')
+        except Exception:
+            return False
     
     def print_config(self):
         """Выводит текущую конфигурацию"""
@@ -37,4 +41,5 @@ class Config:
         print(f"   Страниц: {self.max_pages}")
         print(f"   Интервал: {self.check_hours} ч.")
         print(f"   SJ API: {'✓' if self.sj_api_key else '❌ НЕ УКАЗАН'}")
+        print(f"   Raw mode: {'ON' if self.raw_mode else 'OFF'}")
         print()
